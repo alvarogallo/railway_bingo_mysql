@@ -10,10 +10,26 @@ class AmbienteTimer {
         this.conexionesActivas = new Set();
         this.timeStarts = [];
         this.startTimers = [];
-        this.intervalo = 30; // Valor por defecto
+        this.intervalo = 30;
         this.mysqlService = null;
+        this.timeZone = 'America/Bogota';
     }
-
+    formatToBogotaTime(date) {
+        if (!date) return null;
+        return date.toLocaleString('es-CO', { 
+            timeZone: this.timeZone,
+            hour12: false
+        });
+    }
+    formatToBogotaTimeShort(date) {
+        if (!date) return null;
+        return date.toLocaleTimeString('es-CO', { 
+            timeZone: this.timeZone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }    
     async setMySQLConnection(pool) {
         this.mysqlService = new MySQLService(pool);
         if (this.mysqlService.isConnected) {
@@ -73,13 +89,14 @@ class AmbienteTimer {
         const now = new Date();
         let nextPoints = [];
         
-        // Calcular próximos puntos basados en el intervalo
-        const minutes = now.getMinutes();
+        // Obtener minutos en zona horaria de Bogotá
+        const bogotaDate = new Date(now.toLocaleString('en-US', { timeZone: this.timeZone }));
+        const minutes = bogotaDate.getMinutes();
         const currentInterval = Math.floor(minutes / this.intervalo);
         const nextInterval = (currentInterval + 1) * this.intervalo;
 
         // Primer punto
-        let firstPoint = new Date(now);
+        let firstPoint = new Date(bogotaDate);
         firstPoint.setMinutes(nextInterval, 0, 0);
         
         // Segundo punto
@@ -98,10 +115,7 @@ class AmbienteTimer {
         this.startTimers = [];
 
         this.timeStarts = nextPoints.map(date => ({
-            time: date.toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            }),
+            time: this.formatToBogotaTimeShort(date),
             timestamp: date.getTime()
         }));
 
@@ -121,6 +135,7 @@ class AmbienteTimer {
 
         console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, this.timeStarts);
     }
+
 
     updateExpirationTime() {
         this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
@@ -153,35 +168,30 @@ class AmbienteTimer {
     }
 
     getStatus() {
-        const now = Date.now();
+        const now = new Date();
         return {
             conexiones: this.conexiones,
-            createdAt: this.createdAt?.toLocaleString(),
-            expiresAt: this.expiresAt?.toLocaleString(),
-            currentTime: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
+            createdAt: this.formatToBogotaTime(this.createdAt),
+            expiresAt: this.formatToBogotaTime(this.expiresAt),
+            currentTime: this.formatToBogotaTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
-                ...point,
-                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now) / 1000))
+                time: this.formatToBogotaTimeShort(new Date(point.timestamp)),
+                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             })),
             isActive: !!this.timer,
             conexion_mysql: !!this.mysqlService?.isConnected,
-            intervalo: this.intervalo
+            intervalo: this.intervalo,
+            timeZone: this.timeZone
         };
     }
 
     getTimeStarts() {
-        const now = Date.now();
+        const now = new Date();
         return {
-            currentTime: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
+            currentTime: this.formatToBogotaTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
-                ...point,
-                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now) / 1000))
+                time: this.formatToBogotaTimeShort(new Date(point.timestamp)),
+                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             }))
         };
     }
