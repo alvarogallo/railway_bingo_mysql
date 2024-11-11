@@ -5,11 +5,10 @@ const fetch = require('node-fetch');
 const TIMEZONE = 'America/Bogota';
 moment.tz.setDefault(TIMEZONE);
 
-// Configuración correcta verificada
 const DEFAULT_CONFIG = {
     canal: 'Bingo_Automatico',
     token: 'bingo_automatico',
-    baseUrl: 'https://railwaynodemysql-production-ba44.up.railway.app/enviar-mensaje'  // Ruta verificada
+    baseUrl: 'https://railwaynodemysql-production-ba44.up.railway.app/enviar-mensaje'
 };
 
 class EventosService {
@@ -23,21 +22,25 @@ class EventosService {
         console.log('URL:', this.socketUrl);
     }
 
-    async emitirEvento(param1, param2, fecha_bingo) {
+    async emitirEvento(tipo, nombreEvento, fecha, mensaje = null) {
         try {
-            const fechaFormateada = this.formatearFecha(fecha_bingo);
-            const nombreEvento = 'Bingo_empieza';
-
+            const fechaFormateada = this.formatearFecha(fecha);
+            
             const data = {
                 canal: this.socketCanal,
                 token: this.socketToken,
                 evento: nombreEvento,
-                mensaje: {
+                mensaje: mensaje || {
                     fecha_bingo: fechaFormateada,
                     timestamp: moment().tz(TIMEZONE).format('YYYY-MM-DD HH:mm:ss'),
                     zonaHoraria: TIMEZONE
                 }
             };
+
+            console.log('Enviando evento:', {
+                evento: nombreEvento,
+                mensaje: data.mensaje
+            });
 
             const response = await fetch(this.socketUrl, {
                 method: 'POST',
@@ -50,7 +53,7 @@ class EventosService {
             const responseData = await response.json();
 
             if (response.ok) {
-                console.log('✅ Evento enviado:', responseData.mensaje);
+                console.log('✅ Evento enviado:', nombreEvento);
                 return true;
             } else {
                 throw new Error(`Error: ${responseData.mensaje || 'Error desconocido'}`);

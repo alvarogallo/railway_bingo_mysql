@@ -1,5 +1,6 @@
 const MySQLService = require('./services/mysqlService');
 const EventosService = require('./services/eventos');
+const bingoService = require('./services/bingoService');
 
 class AmbienteTimer {
     constructor() {
@@ -13,6 +14,14 @@ class AmbienteTimer {
         this.startTimers = [];
         this.intervalo = 30;
         this.mysqlService = null;
+        this.bingoService = bingoService;
+
+        // Verificar que el servicio de bingo se inicializó correctamente
+        if (!this.bingoService) {
+            console.error('⚠️ Error: bingoService no se inicializó correctamente');
+        } else {
+            console.log('✅ BingoService inicializado correctamente');
+        }
     }
 
     async setMySQLConnection(pool) {
@@ -127,18 +136,34 @@ class AmbienteTimer {
             const timeUntilStart = point.timestamp - now.getTime();
             if (timeUntilStart > 0) {
                 const timer = setTimeout(async () => {
-                    console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
-                    
-                    // Emitir evento de inicio de bingo
-                    const fecha_bingo = new Date(point.timestamp);
-                    await EventosService.emitirEvento(
-                        'Bingo', // Ajusta según necesites
-                        'Inicia', // Ajusta según necesites
-                        fecha_bingo
-                    );
+                    try {
+                        console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
+                        
+                        if (!this.bingoService) {
+                            console.error('⚠️ Error: bingoService no está disponible');
+                            return;
+                        }
 
-                    if (this.mysqlService?.isConnected) {
-                        await this.mysqlService.registrarTimeStart(fecha_bingo);
+                        if (this.bingoService.isRunning) {
+                            console.log('⚠️ Ya hay un bingo en curso');
+                        } else {
+                            console.log('🎲 Iniciando nuevo bingo...');
+                            this.bingoService.start();
+                            
+                            // Emitir evento de inicio de bingo
+                            const fecha_bingo = new Date(point.timestamp);
+                            await EventosService.emitirEvento(
+                                'Bingo',
+                                'Inicia',
+                                fecha_bingo
+                            );
+
+                            if (this.mysqlService?.isConnected) {
+                                await this.mysqlService.registrarTimeStart(fecha_bingo);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error al iniciar bingo:', error);
                     }
                 }, timeUntilStart);
                 this.startTimers.push(timer);
@@ -168,6 +193,11 @@ class AmbienteTimer {
             await this.mysqlService.limpiarRegistros();
         }
         
+        // Detener el bingo si está en curso
+        if (this.bingoService) {
+            this.bingoService.stop();
+        }
+        
         this.startTimers.forEach(timer => clearTimeout(timer));
         this.startTimers = [];
         this.conexiones = 0;
@@ -190,6 +220,8 @@ class AmbienteTimer {
                 secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             })),
             isActive: !!this.timer,
+            bingoEnCurso: this.bingoService ? this.bingoService.isRunning : false,
+            numerosBingoUsados: this.bingoService ? this.bingoService.usedNumbers.length : 0,
             conexion_mysql: !!this.mysqlService?.isConnected,
             intervalo: this.intervalo
         };
