@@ -1,144 +1,74 @@
-const MySQLService = require('./services/mysqlService');
-
-class AmbienteTimer {
-    constructor() {
-        this.conexiones = 0;
-        this.createdAt = null;
-        this.expiresAt = null;
-        this.timer = null;
-        this.hoursToLive = 1;
-        this.conexionesActivas = new Set();
-        this.timeStarts = [];
-        this.startTimers = [];
-        this.intervalo = 30; // Valor por defecto
-        this.mysqlService = null;
+class MySQLService {
+    constructor(pool) {
+        this.pool = pool;
+        this.isConnected = !!pool;
     }
 
-    async setMySQLConnection(pool) {
-        this.mysqlService = new MySQLService(pool);
-        if (this.mysqlService.isConnected) {
-            await this.loadParameters();
-        }
-    }
-
-    async loadParameters() {
+    async getParametro(nombre) {
         try {
-            const intervalo = await this.mysqlService.getParametro('intervalo');
-            if (intervalo) {
-                this.intervalo = parseInt(intervalo);
-                console.log(`Intervalo cargado de la base de datos: ${this.intervalo} minutos`);
-            }
+            if (!this.isConnected) return null;
+            
+            const [rows] = await this.pool.query(
+                'SELECT valor FROM parametros WHERE nombre = ?', 
+                [nombre]
+            );
+            
+            return rows.length > 0 ? rows[0].valor : null;
         } catch (error) {
-            console.log('Error al cargar parámetros:', error.message);
+            console.log('Error al obtener parámetro:', error.message);
+            return null;
         }
     }
 
-    async initialize(ip) {
-        if (!this.createdAt) {
-            this.createdAt = new Date();
-            this.conexiones = 1;
-            this.conexionesActivas.add(ip);
-            this.updateExpirationTime();
-            this.calculateTimeStarts();
-            this.setTimer();
+    async registrarConexion(ip, expiresAt) {
+        try {
+            if (!this.isConnected) return false;
             
-            if (this.mysqlService?.isConnected) {
-                await this.mysqlService.registrarConexion(ip, this.expiresAt);
-            }
+            await this.pool.query(
+                'INSERT INTO conexiones (ip, expires_at) VALUES (?, ?)',
+                [ip, expiresAt]
+            );
             
-            console.log(`Primera conexión desde ${ip}. Ambiente inicializado.`);
+            return true;
+        } catch (error) {
+            console.log('Error al registrar conexión:', error.message);
+            return false;
         }
     }
 
-    calculateTimeStarts() {
-        const now = new Date();
-        let nextPoints = [];
-        
-        // Calcular próximos puntos basados en el intervalo
-        const minutes = now.getMinutes();
-        const currentInterval = Math.floor(minutes / this.intervalo);
-        const nextInterval = (currentInterval + 1) * this.intervalo;
-
-        // Primer punto
-        let firstPoint = new Date(now);
-        firstPoint.setMinutes(nextInterval, 0, 0);
-        
-        // Segundo punto
-        let secondPoint = new Date(firstPoint);
-        secondPoint.setMinutes(nextInterval + this.intervalo, 0, 0);
-
-        if (secondPoint.getMinutes() >= 60) {
-            secondPoint.setHours(secondPoint.getHours() + 1);
-            secondPoint.setMinutes(secondPoint.getMinutes() - 60);
+    async registrarTimeStart(startTime) {
+        try {
+            if (!this.isConnected) return false;
+            
+            await this.pool.query(
+                'INSERT INTO time_starts (start_time) VALUES (?)',
+                [startTime]
+            );
+            
+            return true;
+        } catch (error) {
+            console.log('Error al registrar time start:', error.message);
+            return false;
         }
-
-        nextPoints = [firstPoint, secondPoint];
-
-        // Limpiar timers anteriores
-        this.startTimers.forEach(timer => clearTimeout(timer));
-        this.startTimers = [];
-
-        this.timeStarts = nextPoints.map(date => ({
-            time: date.toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            }),
-            timestamp: date.getTime()
-        }));
-
-        // Configurar nuevos timers
-        this.timeStarts.forEach(async point => {
-            const timeUntilStart = point.timestamp - Date.now();
-            if (timeUntilStart > 0) {
-                const timer = setTimeout(async () => {
-                    console.log('\x1b[32m%s\x1b[0m', `=== HORA DE ARRANCAR (${point.time}) ===`);
-                    if (this.mysqlService?.isConnected) {
-                        await this.mysqlService.registrarTimeStart(new Date(point.timestamp));
-                    }
-                }, timeUntilStart);
-                this.startTimers.push(timer);
-            }
-        });
-
-        console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, this.timeStarts);
     }
 
-    async reset() {
-        if (this.mysqlService?.isConnected) {
-            await this.mysqlService.limpiarRegistros();
+    async limpiarRegistros() {
+        try {
+            if (!this.isConnected) return false;
+            
+            await this.pool.query('DELETE FROM conexiones WHERE expires_at < NOW()');
+            await this.pool.query('DELETE FROM time_starts WHERE start_time < NOW()');
+            
+            return true;
+        } catch (error) {
+            console.log('Error al limpiar registros:', error.message);
+            return false;
         }
-        
-        this.startTimers.forEach(timer => clearTimeout(timer));
-        this.startTimers = [];
-        this.conexiones = 0;
-        this.createdAt = null;
-        this.expiresAt = null;
-        this.timer = null;
-        this.conexionesActivas.clear();
-        this.timeStarts = [];
     }
 
-    getStatus() {
-        const now = Date.now();
-        return {
-            conexiones: this.conexiones,
-            createdAt: this.createdAt?.toLocaleString(),
-            expiresAt: this.expiresAt?.toLocaleString(),
-            currentTime: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
-            timeStarts: this.timeStarts.map(point => ({
-                ...point,
-                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now) / 1000))
-            })),
-            isActive: !!this.timer,
-            conexion_mysql: !!this.mysqlService?.isConnected,
-            intervalo: this.intervalo
-        };
+    isConnected() {
+        return this.isConnected;
     }
-
-    // ... otros métodos permanecen igual ...
 }
 
-module.exports = AmbienteTimer;
+module.exports = MySQLService;
