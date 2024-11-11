@@ -7,23 +7,25 @@ moment.tz.setDefault(TIMEZONE);
 
 class EventosService {
     constructor() {
-        // Verificar y asignar valores con fallbacks
-        if (!process.env.SOCKET_CANAL || !process.env.SOCKET_TOKEN || !process.env.SOCKET_URL) {
-            console.log('⚠️ Variables de entorno de Socket no configuradas');
+        this.socketCanal = process.env.SOCKET_CANAL;
+        this.socketToken = process.env.SOCKET_TOKEN;
+        this.socketUrl = process.env.SOCKET_URL;
+
+        // Asegurar URL completa con el endpoint correcto
+        if (this.socketUrl) {
+            // Asegurar que tenga https://
+            if (!this.socketUrl.startsWith('http')) {
+                this.socketUrl = `https://${this.socketUrl}`;
+            }
+            // Asegurar que termine en /socket/enviar-mensaje
+            if (!this.socketUrl.endsWith('/socket/enviar-mensaje')) {
+                this.socketUrl = `${this.socketUrl}/socket/enviar-mensaje`;
+            }
         }
 
-        this.socketCanal = process.env.SOCKET_CANAL || 'Bingo_Automatico';
-        this.socketToken = process.env.SOCKET_TOKEN || 'bingo_automatico';
-        this.socketUrl = process.env.SOCKET_URL || 'https://railwaynodemysql-production-ba44.up.railway.app';
-
-        // Asegurar que la URL tenga el protocolo
-        if (!this.socketUrl.startsWith('http')) {
-            this.socketUrl = `https://${this.socketUrl}`;
-        }
-
-        console.log('Socket configurado con:');
+        console.log('Socket configurado:');
         console.log('- Canal:', this.socketCanal);
-        console.log('- URL:', this.socketUrl);
+        console.log('- Endpoint:', this.socketUrl);
     }
 
     formatearFecha(fecha) {
@@ -31,6 +33,11 @@ class EventosService {
     }
 
     async emitirEvento(param1, param2, fecha_bingo) {
+        if (!this.socketCanal || !this.socketToken || !this.socketUrl) {
+            console.error('No se puede emitir evento: faltan variables de configuración');
+            return false;
+        }
+
         try {
             const fechaFormateada = this.formatearFecha(fecha_bingo);
             const nombreEvento = 'Bingo_empieza';
@@ -50,8 +57,7 @@ class EventosService {
                 mensaje: mensaje
             };
 
-            console.log(`Enviando evento a: ${this.socketUrl}`);
-            console.log(`Evento: ${nombreEvento}`);
+            console.log(`Enviando evento "${nombreEvento}" al canal "${this.socketCanal}"`);
             console.log('Data:', JSON.stringify(data, null, 2));
 
             const response = await fetch(this.socketUrl, {
@@ -62,18 +68,18 @@ class EventosService {
                 body: JSON.stringify(data)
             });
 
-            const httpCode = response.status;
-            if (httpCode !== 200) {
-                throw new Error(`Error HTTP: ${httpCode}`);
+            if (!response.ok) {
+                const responseText = await response.text();
+                throw new Error(`Error HTTP ${response.status}: ${responseText}`);
             }
 
             const responseData = await response.text();
+            console.log('✅ Evento enviado exitosamente');
             console.log('Respuesta:', responseData);
             return true;
 
         } catch (error) {
-            console.error('Error al emitir evento:', error.message);
-            console.error('URL utilizada:', this.socketUrl);
+            console.error('❌ Error al emitir evento:', error.message);
             return false;
         }
     }
