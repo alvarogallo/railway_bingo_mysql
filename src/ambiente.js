@@ -14,22 +14,7 @@ class AmbienteTimer {
         this.mysqlService = null;
         this.timeZone = 'America/Bogota';
     }
-    formatToBogotaTime(date) {
-        if (!date) return null;
-        return date.toLocaleString('es-CO', { 
-            timeZone: this.timeZone,
-            hour12: false
-        });
-    }
-    formatToBogotaTimeShort(date) {
-        if (!date) return null;
-        return date.toLocaleTimeString('es-CO', { 
-            timeZone: this.timeZone,
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-    }    
+
     async setMySQLConnection(pool) {
         this.mysqlService = new MySQLService(pool);
         if (this.mysqlService.isConnected) {
@@ -47,6 +32,28 @@ class AmbienteTimer {
         } catch (error) {
             console.log('Error al cargar parámetros:', error.message);
         }
+    }
+
+    getBogotaTime(date = new Date()) {
+        return new Date(date.toLocaleString('en-US', { timeZone: this.timeZone }));
+    }
+
+    formatToBogotaTime(date) {
+        if (!date) return null;
+        return date.toLocaleString('es-CO', { 
+            timeZone: this.timeZone,
+            hour12: false
+        });
+    }
+
+    formatToBogotaTimeShort(date) {
+        if (!date) return null;
+        return date.toLocaleTimeString('es-CO', { 
+            timeZone: this.timeZone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
     }
 
     async initialize(ip) {
@@ -86,42 +93,48 @@ class AmbienteTimer {
     }
 
     calculateTimeStarts() {
-        const now = new Date();
-        let nextPoints = [];
-        
-        // Obtener minutos en zona horaria de Bogotá
-        const bogotaDate = new Date(now.toLocaleString('en-US', { timeZone: this.timeZone }));
-        const minutes = bogotaDate.getMinutes();
-        const currentInterval = Math.floor(minutes / this.intervalo);
-        const nextInterval = (currentInterval + 1) * this.intervalo;
-
-        // Primer punto
-        let firstPoint = new Date(bogotaDate);
-        firstPoint.setMinutes(nextInterval, 0, 0);
-        
-        // Segundo punto
-        let secondPoint = new Date(firstPoint);
-        secondPoint.setMinutes(nextInterval + this.intervalo, 0, 0);
-
-        if (secondPoint.getMinutes() >= 60) {
-            secondPoint.setHours(secondPoint.getHours() + 1);
-            secondPoint.setMinutes(secondPoint.getMinutes() - 60);
-        }
-
-        nextPoints = [firstPoint, secondPoint];
+        const now = this.getBogotaTime();
+        const minutes = now.getMinutes();
+        const hours = now.getHours();
 
         // Limpiar timers anteriores
         this.startTimers.forEach(timer => clearTimeout(timer));
         this.startTimers = [];
 
+        // Calcular próximos puntos de inicio
+        let nextPoints = [];
+        let firstPointMinutes = Math.ceil(minutes / this.intervalo) * this.intervalo;
+        let firstPointHours = hours;
+
+        // Ajustar si los minutos pasan a la siguiente hora
+        if (firstPointMinutes >= 60) {
+            firstPointMinutes = 0;
+            firstPointHours += 1;
+        }
+
+        // Primer punto
+        let firstPoint = new Date(now);
+        firstPoint.setHours(firstPointHours, firstPointMinutes, 0, 0);
+
+        // Segundo punto
+        let secondPoint = new Date(firstPoint);
+        if (firstPointMinutes + this.intervalo >= 60) {
+            secondPoint.setHours(firstPointHours + 1, 0, 0, 0);
+        } else {
+            secondPoint.setMinutes(firstPointMinutes + this.intervalo);
+        }
+
+        nextPoints = [firstPoint, secondPoint];
+
+        // Actualizar timeStarts
         this.timeStarts = nextPoints.map(date => ({
             time: this.formatToBogotaTimeShort(date),
             timestamp: date.getTime()
         }));
 
-        // Configurar nuevos timers
-        this.timeStarts.forEach(async point => {
-            const timeUntilStart = point.timestamp - Date.now();
+        // Configurar los timers
+        this.timeStarts.forEach(point => {
+            const timeUntilStart = point.timestamp - now.getTime();
             if (timeUntilStart > 0) {
                 const timer = setTimeout(async () => {
                     console.log('\x1b[32m%s\x1b[0m', `=== HORA DE ARRANCAR (${point.time}) ===`);
@@ -133,9 +146,9 @@ class AmbienteTimer {
             }
         });
 
-        console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, this.timeStarts);
+        console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, 
+            this.timeStarts.map(t => t.time));
     }
-
 
     updateExpirationTime() {
         this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
@@ -168,14 +181,14 @@ class AmbienteTimer {
     }
 
     getStatus() {
-        const now = new Date();
+        const now = this.getBogotaTime();
         return {
             conexiones: this.conexiones,
             createdAt: this.formatToBogotaTime(this.createdAt),
             expiresAt: this.formatToBogotaTime(this.expiresAt),
             currentTime: this.formatToBogotaTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
-                time: this.formatToBogotaTimeShort(new Date(point.timestamp)),
+                time: point.time,
                 secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             })),
             isActive: !!this.timer,
@@ -186,11 +199,11 @@ class AmbienteTimer {
     }
 
     getTimeStarts() {
-        const now = new Date();
+        const now = this.getBogotaTime();
         return {
             currentTime: this.formatToBogotaTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
-                time: this.formatToBogotaTimeShort(new Date(point.timestamp)),
+                time: point.time,
                 secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             }))
         };
