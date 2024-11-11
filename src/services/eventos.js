@@ -34,8 +34,6 @@ class EventosService {
                 evento: nombreEvento,
                 mensaje: {
                     fecha_bingo: fechaFormateada,
-                    param1: param1,
-                    param2: param2,
                     timestamp: moment().tz(TIMEZONE).format('YYYY-MM-DD HH:mm:ss'),
                     zonaHoraria: TIMEZONE
                 }
