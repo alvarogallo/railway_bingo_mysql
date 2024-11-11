@@ -17,7 +17,7 @@ class AmbienteTimer {
         this.conexion_mysql = !!pool;
     }
 
-    async initialize(ip) {
+    initialize(ip) {
         if (!this.createdAt) {
             this.createdAt = new Date();
             this.conexiones = 1;
@@ -25,79 +25,8 @@ class AmbienteTimer {
             this.updateExpirationTime();
             this.calculateTimeStarts();
             this.setTimer();
-            
-            if (this.conexion_mysql && this.pool) {
-                try {
-                    await this.pool.query(
-                        'INSERT INTO conexiones (ip, expires_at) VALUES (?, ?)',
-                        [ip, this.expiresAt]
-                    );
-                } catch (error) {
-                    // Silenciosamente fallar y deshabilitar MySQL
-                    this.conexion_mysql = false;
-                    this.pool = null;
-                }
-            }
-            
             console.log(`Primera conexión desde ${ip}. Ambiente inicializado.`);
         }
-    }
-
-    async addConexion(ip) {
-        if (!this.conexionesActivas.has(ip)) {
-            this.conexiones += 1;
-            this.conexionesActivas.add(ip);
-            this.updateExpirationTime();
-            this.setTimer();
-
-            if (this.conexion_mysql && this.pool) {
-                try {
-                    await this.pool.query(
-                        'INSERT INTO conexiones (ip, expires_at) VALUES (?, ?)',
-                        [ip, this.expiresAt]
-                    );
-                } catch (error) {
-                    // Silenciosamente fallar y deshabilitar MySQL
-                    this.conexion_mysql = false;
-                    this.pool = null;
-                }
-            }
-
-            console.log(`Nueva conexión desde ${ip}. Total conexiones: ${this.conexiones}`);
-        } else {
-            this.updateExpirationTime();
-            this.setTimer();
-            console.log(`Conexión existente desde ${ip}. Extendiendo tiempo.`);
-        }
-    }
-
-    async reset() {
-        this.startTimers.forEach(timer => clearTimeout(timer));
-        this.startTimers = [];
-        
-        if (this.conexion_mysql && this.pool) {
-            try {
-                await this.pool.query('DELETE FROM time_starts WHERE 1=1');
-                await this.pool.query('DELETE FROM conexiones WHERE 1=1');
-            } catch (error) {
-                // Silenciosamente fallar y deshabilitar MySQL
-                this.conexion_mysql = false;
-                this.pool = null;
-            }
-        }
-
-        this.conexiones = 0;
-        this.createdAt = null;
-        this.expiresAt = null;
-        this.timer = null;
-        this.conexionesActivas.clear();
-        this.timeStarts = [];
-    }
-
-    // El resto de los métodos permanecen igual...
-    updateExpirationTime() {
-        this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
-        this.calculateTimeStarts();
     }
 
     calculateTimeStarts() {
@@ -129,6 +58,7 @@ class AmbienteTimer {
                 timestamp: date.getTime()
             }));
 
+        // Configurar alertas para los puntos de arranque
         this.timeStarts.forEach(point => {
             const timeUntilStart = point.timestamp - Date.now();
             if (timeUntilStart > 0) {
@@ -138,6 +68,13 @@ class AmbienteTimer {
                 this.startTimers.push(timer);
             }
         });
+
+        console.log('Puntos de arranque calculados:', this.timeStarts);
+    }
+
+    updateExpirationTime() {
+        this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
+        this.calculateTimeStarts();
     }
 
     setTimer() {
@@ -148,6 +85,31 @@ class AmbienteTimer {
             this.reset();
             console.log('Ambiente reseteado por timeout');
         }, this.hoursToLive * 60 * 60 * 1000);
+    }
+
+    reset() {
+        this.startTimers.forEach(timer => clearTimeout(timer));
+        this.startTimers = [];
+        this.conexiones = 0;
+        this.createdAt = null;
+        this.expiresAt = null;
+        this.timer = null;
+        this.conexionesActivas.clear();
+        this.timeStarts = [];
+    }
+
+    addConexion(ip) {
+        if (!this.conexionesActivas.has(ip)) {
+            this.conexiones += 1;
+            this.conexionesActivas.add(ip);
+            this.updateExpirationTime();
+            this.setTimer();
+            console.log(`Nueva conexión desde ${ip}. Total conexiones: ${this.conexiones}`);
+        } else {
+            console.log(`Conexión existente desde ${ip}. Extendiendo tiempo.`);
+            this.updateExpirationTime();
+            this.setTimer();
+        }
     }
 
     getStatus() {
@@ -166,20 +128,6 @@ class AmbienteTimer {
             })),
             isActive: !!this.timer,
             conexion_mysql: this.conexion_mysql
-        };
-    }
-
-    getTimeStarts() {
-        const now = Date.now();
-        return {
-            currentTime: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
-            timeStarts: this.timeStarts.map(point => ({
-                ...point,
-                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now) / 1000))
-            }))
         };
     }
 }
