@@ -12,7 +12,6 @@ class AmbienteTimer {
         this.startTimers = [];
         this.intervalo = 30;
         this.mysqlService = null;
-        this.timeZone = 'America/Bogota';
     }
 
     async setMySQLConnection(pool) {
@@ -34,22 +33,8 @@ class AmbienteTimer {
         }
     }
 
-    getBogotaTime(date = new Date()) {
-        return new Date(date.toLocaleString('en-US', { timeZone: this.timeZone }));
-    }
-
-    formatToBogotaTime(date) {
-        if (!date) return null;
-        return date.toLocaleString('es-CO', { 
-            timeZone: this.timeZone,
-            hour12: false
-        });
-    }
-
-    formatToBogotaTimeShort(date) {
-        if (!date) return null;
-        return date.toLocaleTimeString('es-CO', { 
-            timeZone: this.timeZone,
+    formatTimeShort(date) {
+        return date.toLocaleTimeString('es-CO', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
@@ -93,51 +78,53 @@ class AmbienteTimer {
     }
 
     calculateTimeStarts() {
-        const now = this.getBogotaTime();
-        const minutes = now.getMinutes();
-        const hours = now.getHours();
+        const now = new Date();
+        const currentMinutes = now.getMinutes();
+        const currentHour = now.getHours();
 
         // Limpiar timers anteriores
         this.startTimers.forEach(timer => clearTimeout(timer));
         this.startTimers = [];
 
-        // Calcular próximos puntos de inicio
-        let nextPoints = [];
-        let firstPointMinutes = Math.ceil(minutes / this.intervalo) * this.intervalo;
-        let firstPointHours = hours;
+        // Calcular próximo intervalo
+        const nextIntervalMinutes = Math.ceil(currentMinutes / this.intervalo) * this.intervalo;
+        let firstPointHour = currentHour;
+        let firstPointMinutes = nextIntervalMinutes;
 
-        // Ajustar si los minutos pasan a la siguiente hora
+        // Ajustar si pasamos a la siguiente hora
         if (firstPointMinutes >= 60) {
+            firstPointHour++;
             firstPointMinutes = 0;
-            firstPointHours += 1;
         }
 
-        // Primer punto
-        let firstPoint = new Date(now);
-        firstPoint.setHours(firstPointHours, firstPointMinutes, 0, 0);
+        // Crear puntos de arranque
+        const firstPoint = new Date(now);
+        firstPoint.setHours(firstPointHour, firstPointMinutes, 0, 0);
 
-        // Segundo punto
-        let secondPoint = new Date(firstPoint);
+        const secondPoint = new Date(firstPoint);
         if (firstPointMinutes + this.intervalo >= 60) {
-            secondPoint.setHours(firstPointHours + 1, 0, 0, 0);
+            secondPoint.setHours(firstPointHour + 1, 0, 0, 0);
         } else {
             secondPoint.setMinutes(firstPointMinutes + this.intervalo);
         }
 
-        nextPoints = [firstPoint, secondPoint];
+        this.timeStarts = [
+            {
+                time: this.formatTimeShort(firstPoint),
+                timestamp: firstPoint.getTime()
+            },
+            {
+                time: this.formatTimeShort(secondPoint),
+                timestamp: secondPoint.getTime()
+            }
+        ];
 
-        // Actualizar timeStarts
-        this.timeStarts = nextPoints.map(date => ({
-            time: this.formatToBogotaTimeShort(date),
-            timestamp: date.getTime()
-        }));
-
-        // Configurar los timers
+        // Configurar timers
         this.timeStarts.forEach(point => {
             const timeUntilStart = point.timestamp - now.getTime();
             if (timeUntilStart > 0) {
                 const timer = setTimeout(async () => {
-                    console.log('\x1b[32m%s\x1b[0m', `=== HORA DE ARRANCAR (${point.time}) ===`);
+                    console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
                     if (this.mysqlService?.isConnected) {
                         await this.mysqlService.registrarTimeStart(new Date(point.timestamp));
                     }
@@ -146,8 +133,7 @@ class AmbienteTimer {
             }
         });
 
-        console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, 
-            this.timeStarts.map(t => t.time));
+        console.log('Próximos puntos de arranque:', this.timeStarts.map(t => t.time).join(', '));
     }
 
     updateExpirationTime() {
@@ -181,27 +167,26 @@ class AmbienteTimer {
     }
 
     getStatus() {
-        const now = this.getBogotaTime();
+        const now = new Date();
         return {
             conexiones: this.conexiones,
-            createdAt: this.formatToBogotaTime(this.createdAt),
-            expiresAt: this.formatToBogotaTime(this.expiresAt),
-            currentTime: this.formatToBogotaTimeShort(now),
+            createdAt: this.createdAt?.toLocaleString(),
+            expiresAt: this.expiresAt?.toLocaleString(),
+            currentTime: this.formatTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
                 time: point.time,
                 secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
             })),
             isActive: !!this.timer,
             conexion_mysql: !!this.mysqlService?.isConnected,
-            intervalo: this.intervalo,
-            timeZone: this.timeZone
+            intervalo: this.intervalo
         };
     }
 
     getTimeStarts() {
-        const now = this.getBogotaTime();
+        const now = new Date();
         return {
-            currentTime: this.formatToBogotaTimeShort(now),
+            currentTime: this.formatTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
                 time: point.time,
                 secondsUntilStart: Math.max(0, Math.round((point.timestamp - now.getTime()) / 1000))
