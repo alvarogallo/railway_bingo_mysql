@@ -1,4 +1,5 @@
 const MySQLService = require('./services/mysqlService');
+const EventosService = require('./services/eventos');
 
 class AmbienteTimer {
     constructor() {
@@ -127,8 +128,17 @@ class AmbienteTimer {
             if (timeUntilStart > 0) {
                 const timer = setTimeout(async () => {
                     console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
+                    
+                    // Emitir evento de inicio de bingo
+                    const fecha_bingo = new Date(point.timestamp);
+                    await EventosService.emitirEvento(
+                        'Bingo', // Ajusta según necesites
+                        'Inicia', // Ajusta según necesites
+                        fecha_bingo
+                    );
+
                     if (this.mysqlService?.isConnected) {
-                        await this.mysqlService.registrarTimeStart(new Date(point.timestamp));
+                        await this.mysqlService.registrarTimeStart(fecha_bingo);
                     }
                 }, timeUntilStart);
                 this.startTimers.push(timer);
