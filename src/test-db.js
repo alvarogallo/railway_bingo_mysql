@@ -1,18 +1,18 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-// Configuración de colores para consola
-const colors = {
-    reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    green: '\x1b[32m',
-    red: '\x1b[31m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    white: '\x1b[37m'
-};
-
 async function testDatabaseConnection() {
+    // Configuración de colores para consola
+    const colors = {
+        reset: '\x1b[0m',
+        bright: '\x1b[1m',
+        green: '\x1b[32m',
+        red: '\x1b[31m',
+        yellow: '\x1b[33m',
+        blue: '\x1b[34m',
+        white: '\x1b[37m'
+    };
+
     console.log(`${colors.bright}${colors.blue}=== Test de Conexión a Base de Datos ===${colors.reset}\n`);
 
     // Mostrar variables de entorno
@@ -44,22 +44,23 @@ async function testDatabaseConnection() {
         console.log(`\n${colors.green}✓ Conexión establecida exitosamente${colors.reset}`);
 
         // Test 1: Consulta simple
-        console.log('\n1. Prueba de consulta simple...');
+        console.log(`\n${colors.bright}Ejecutando pruebas:${colors.reset}`);
+        console.log('1. Consulta simple...');
         const [result1] = await connection.query('SELECT 1 + 1 AS result');
-        console.log(`${colors.green}✓ Resultado: ${result1[0].result}${colors.reset}`);
+        console.log(`${colors.green}✓ Consulta simple exitosa. Resultado: ${result1[0].result}${colors.reset}`);
 
-        // Test 2: Versión de MySQL
+        // Test 2: Mostrar versión de MySQL
         console.log('\n2. Versión de MySQL...');
         const [result2] = await connection.query('SELECT VERSION() as version');
-        console.log(`${colors.green}✓ Versión: ${result2[0].version}${colors.reset}`);
+        console.log(`${colors.green}✓ Versión de MySQL: ${result2[0].version}${colors.reset}`);
 
-        // Test 3: Base de datos actual
+        // Test 3: Verificar la base de datos actual
         console.log('\n3. Base de datos actual...');
         const [result3] = await connection.query('SELECT DATABASE() as db');
-        console.log(`${colors.green}✓ Base de datos: ${result3[0].db}${colors.reset}`);
+        console.log(`${colors.green}✓ Base de datos actual: ${result3[0].db}${colors.reset}`);
 
         // Test 4: Listar tablas
-        console.log('\n4. Tablas en la base de datos...');
+        console.log('\n4. Listando tablas...');
         const [tables] = await connection.query('SHOW TABLES');
         console.log(`${colors.green}✓ Tablas encontradas: ${tables.length}${colors.reset}`);
         tables.forEach(table => {
@@ -67,11 +68,16 @@ async function testDatabaseConnection() {
             console.log(`  - ${tableName}`);
         });
 
-        await connection.end();
-        console.log(`\n${colors.green}${colors.bright}✓ Test completado exitosamente${colors.reset}`);
+        // Test 5: Verificar privilegios del usuario
+        console.log('\n5. Verificando privilegios...');
+        const [privileges] = await connection.query('SHOW GRANTS');
+        console.log(`${colors.green}✓ Privilegios del usuario:${colors.reset}`);
+        privileges.forEach(priv => {
+            console.log(`  - ${Object.values(priv)[0]}`);
+        });
 
-        // Mantener el proceso activo por un momento para que Railway pueda ver los logs
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await connection.end();
+        console.log(`\n${colors.green}${colors.bright}✓ Todos los tests completados exitosamente${colors.reset}`);
         process.exit(0);
 
     } catch (error) {
@@ -85,6 +91,7 @@ async function testDatabaseConnection() {
             case 'ECONNREFUSED':
                 console.log('- Verifica que el host y puerto sean correctos');
                 console.log('- Confirma que el servidor MySQL esté activo');
+                console.log('- Revisa si hay restricciones de firewall');
                 break;
             case 'ER_ACCESS_DENIED_ERROR':
                 console.log('- Verifica el usuario y contraseña');
@@ -97,13 +104,10 @@ async function testDatabaseConnection() {
             default:
                 console.log('- Verifica todas las variables de entorno');
                 console.log('- Confirma que las credenciales sean correctas');
+                console.log('- Asegúrate de que la base de datos esté activa');
         }
-
-        // Mantener el proceso activo por un momento para que Railway pueda ver los logs
-        await new Promise(resolve => setTimeout(resolve, 5000));
         process.exit(1);
     }
 }
 
-// Ejecutar el test
 testDatabaseConnection();
