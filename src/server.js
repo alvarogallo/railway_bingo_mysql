@@ -1,32 +1,46 @@
 require('dotenv').config();
 const express = require('express');
-const AmbienteTimer = require('./ambiente');
-const setupApiRoutes = require('./api');
-const { createPool } = require('./config/database');
+const EventosService = require('./services/eventos');
+const moment = require('moment-timezone');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-async function startServer() {
-    // Instancia del ambiente
-    const ambienteTimer = new AmbienteTimer();
-
+async function testSocket() {
+    console.log('=== TEST DE SOCKET ===');
+    console.log('Hora actual:', moment().format('YYYY-MM-DD HH:mm:ss'));
+    
     try {
-        // Intentar crear pool de conexiones
-        const pool = await createPool();
-        ambienteTimer.setMySQLConnection(pool);
+        // Simular un punto de arranque (hora actual + 1 minuto)
+        const fechaBingo = new Date(Date.now() + 60000);
+        
+        console.log('\nIntentando enviar evento de prueba...');
+        const resultado = await EventosService.emitirEvento(
+            'Bingo',
+            'Inicia',
+            fechaBingo
+        );
+
+        if (resultado) {
+            console.log('\n✅ Test completado exitosamente');
+        } else {
+            console.log('\n❌ Test falló');
+        }
+        
     } catch (error) {
-        console.log('\x1b[33m%s\x1b[0m', 'No conexión base de datos');
-        // Continuar sin MySQL
+        console.error('\n❌ Error en el test:', error);
     }
-
-    // Configurar rutas API
-    app.use('/api', setupApiRoutes(ambienteTimer));
-
-    app.listen(port, () => {
-        console.log(`Servidor corriendo en http://localhost:${port}`);
-        console.log(`Ambiente: ${process.env.NODE_ENV}`);
-    });
 }
 
-startServer();
+// Iniciar servidor y ejecutar test
+app.listen(port, async () => {
+    console.log(`Servidor iniciado en puerto ${port}`);
+    console.log('Ejecutando test de socket...');
+    await testSocket();
+    console.log('\nServidor mantenido activo...');
+});
+
+// Ruta básica para mantener el servidor vivo
+app.get('/', (req, res) => {
+    res.send('Test server running');
+});
