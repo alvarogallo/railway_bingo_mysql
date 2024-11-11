@@ -12,6 +12,12 @@ class AmbienteTimer {
         this.startTimers = [];
         this.intervalo = 30;
         this.mysqlService = null;
+        this.UTC_OFFSET = -5; // Colombia UTC-5
+    }
+    getColombiaTime(date = new Date()) {
+        // Ajustar a hora Colombia (UTC-5)
+        const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+        return new Date(utc + (3600000 * this.UTC_OFFSET));
     }
 
     async setMySQLConnection(pool) {
@@ -34,9 +40,22 @@ class AmbienteTimer {
     }
 
     formatTimeShort(date) {
-        return date.toLocaleTimeString('es-CO', {
+        const colombiaTime = this.getColombiaTime(date);
+        const hours = colombiaTime.getHours().toString().padStart(2, '0');
+        const minutes = colombiaTime.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    formatDateTime(date) {
+        if (!date) return null;
+        const colombiaTime = this.getColombiaTime(date);
+        return colombiaTime.toLocaleString('es-CO', {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
             hour12: false
         });
     }
@@ -78,7 +97,7 @@ class AmbienteTimer {
     }
 
     calculateTimeStarts() {
-        const now = new Date();
+        const now = this.getColombiaTime();
         const currentMinutes = now.getMinutes();
         const currentHour = now.getHours();
 
@@ -167,11 +186,11 @@ class AmbienteTimer {
     }
 
     getStatus() {
-        const now = new Date();
+        const now = this.getColombiaTime();
         return {
             conexiones: this.conexiones,
-            createdAt: this.createdAt?.toLocaleString(),
-            expiresAt: this.expiresAt?.toLocaleString(),
+            createdAt: this.formatDateTime(this.createdAt),
+            expiresAt: this.formatDateTime(this.expiresAt),
             currentTime: this.formatTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
                 time: point.time,
@@ -184,7 +203,7 @@ class AmbienteTimer {
     }
 
     getTimeStarts() {
-        const now = new Date();
+        const now = this.getColombiaTime();
         return {
             currentTime: this.formatTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
@@ -193,6 +212,7 @@ class AmbienteTimer {
             }))
         };
     }
+
 }
 
 module.exports = AmbienteTimer;
