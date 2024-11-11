@@ -7,25 +7,20 @@ moment.tz.setDefault(TIMEZONE);
 
 class EventosService {
     constructor() {
+        // Imprimir valores para debug (sin mostrar el token completo)
+        console.log('Configuración Socket:');
+        console.log('SOCKET_CANAL:', process.env.SOCKET_CANAL);
+        console.log('SOCKET_URL:', process.env.SOCKET_URL);
+        console.log('SOCKET_TOKEN está definido:', !!process.env.SOCKET_TOKEN);
+
         this.socketCanal = process.env.SOCKET_CANAL;
         this.socketToken = process.env.SOCKET_TOKEN;
         this.socketUrl = process.env.SOCKET_URL;
 
-        // Asegurar URL completa con el endpoint correcto
-        if (this.socketUrl) {
-            // Asegurar que tenga https://
-            if (!this.socketUrl.startsWith('http')) {
-                this.socketUrl = `https://${this.socketUrl}`;
-            }
-            // Asegurar que termine en /socket/enviar-mensaje
-            if (!this.socketUrl.endsWith('/socket/enviar-mensaje')) {
-                this.socketUrl = `${this.socketUrl}/socket/enviar-mensaje`;
-            }
+        // Construir URL completa
+        if (this.socketUrl && !this.socketUrl.includes('/socket/enviar-mensaje')) {
+            this.socketUrl = this.socketUrl.replace(/\/?$/, '/socket/enviar-mensaje');
         }
-
-        console.log('Socket configurado:');
-        console.log('- Canal:', this.socketCanal);
-        console.log('- Endpoint:', this.socketUrl);
     }
 
     formatearFecha(fecha) {
@@ -33,8 +28,18 @@ class EventosService {
     }
 
     async emitirEvento(param1, param2, fecha_bingo) {
+        // Debug de variables
+        console.log('Verificando configuración para emisión de evento:');
+        console.log('Canal configurado:', !!this.socketCanal);
+        console.log('Token configurado:', !!this.socketToken);
+        console.log('URL configurada:', !!this.socketUrl);
+        console.log('URL completa:', this.socketUrl);
+
         if (!this.socketCanal || !this.socketToken || !this.socketUrl) {
-            console.error('No se puede emitir evento: faltan variables de configuración');
+            console.error('Faltan variables de configuración:');
+            console.error('- Canal:', !!this.socketCanal);
+            console.error('- Token:', !!this.socketToken);
+            console.error('- URL:', !!this.socketUrl);
             return false;
         }
 
@@ -57,8 +62,11 @@ class EventosService {
                 mensaje: mensaje
             };
 
-            console.log(`Enviando evento "${nombreEvento}" al canal "${this.socketCanal}"`);
-            console.log('Data:', JSON.stringify(data, null, 2));
+            console.log(`Intentando enviar evento a: ${this.socketUrl}`);
+            console.log('Datos del evento:', {
+                ...data,
+                token: '****' // Ocultar token en logs
+            });
 
             const response = await fetch(this.socketUrl, {
                 method: 'POST',
@@ -68,18 +76,21 @@ class EventosService {
                 body: JSON.stringify(data)
             });
 
+            const responseText = await response.text();
+            console.log('Respuesta del servidor:', responseText);
+
             if (!response.ok) {
-                const responseText = await response.text();
                 throw new Error(`Error HTTP ${response.status}: ${responseText}`);
             }
 
-            const responseData = await response.text();
             console.log('✅ Evento enviado exitosamente');
-            console.log('Respuesta:', responseData);
             return true;
 
         } catch (error) {
             console.error('❌ Error al emitir evento:', error.message);
+            if (error.cause) {
+                console.error('Causa:', error.cause);
+            }
             return false;
         }
     }
