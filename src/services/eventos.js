@@ -7,12 +7,23 @@ moment.tz.setDefault(TIMEZONE);
 
 class EventosService {
     constructor() {
-        this.socketCanal = process.env.SOCKET_CANAL;
-        this.socketToken = process.env.SOCKET_TOKEN;
+        // Verificar y asignar valores con fallbacks
+        if (!process.env.SOCKET_CANAL || !process.env.SOCKET_TOKEN || !process.env.SOCKET_URL) {
+            console.log('⚠️ Variables de entorno de Socket no configuradas');
+        }
+
+        this.socketCanal = process.env.SOCKET_CANAL || 'Bingo_Automatico';
+        this.socketToken = process.env.SOCKET_TOKEN || 'bingo_automatico';
+        this.socketUrl = process.env.SOCKET_URL || 'https://railwaynodemysql-production-ba44.up.railway.app';
+
         // Asegurar que la URL tenga el protocolo
-        this.socketUrl = process.env.SOCKET_URL.startsWith('http') 
-            ? process.env.SOCKET_URL 
-            : `https://${process.env.SOCKET_URL}`;
+        if (!this.socketUrl.startsWith('http')) {
+            this.socketUrl = `https://${this.socketUrl}`;
+        }
+
+        console.log('Socket configurado con:');
+        console.log('- Canal:', this.socketCanal);
+        console.log('- URL:', this.socketUrl);
     }
 
     formatearFecha(fecha) {
