@@ -5,22 +5,34 @@ const fetch = require('node-fetch');
 const TIMEZONE = 'America/Bogota';
 moment.tz.setDefault(TIMEZONE);
 
+const DEFAULT_CONFIG = {
+    canal: 'Bingo_Automatico',
+    token: 'bingo_automatico',
+    url: 'https://railwaynodemysql-production-ba44.up.railway.app'
+};
+
 class EventosService {
     constructor() {
-        // Imprimir valores para debug (sin mostrar el token completo)
+        // Usar V2 o valores por defecto
+        this.socketCanal = process.env.SOCKET_CANAL_V2 || DEFAULT_CONFIG.canal;
+        this.socketToken = process.env.SOCKET_TOKEN_V2 || DEFAULT_CONFIG.token;
+        this.socketUrl = process.env.SOCKET_URL_V2 || DEFAULT_CONFIG.url;
+
+        // Imprimir configuración
         console.log('Configuración Socket:');
-        console.log('SOCKET_CANAL:', process.env.SOCKET_CANAL);
-        console.log('SOCKET_URL:', process.env.SOCKET_URL);
-        console.log('SOCKET_TOKEN está definido:', !!process.env.SOCKET_TOKEN);
+        console.log('Canal:', this.socketCanal, 
+            process.env.SOCKET_CANAL_V2 ? '(desde ENV)' : '(valor por defecto)');
+        console.log('URL:', this.socketUrl,
+            process.env.SOCKET_URL_V2 ? '(desde ENV)' : '(valor por defecto)');
+        console.log('Token configurado:', !!this.socketToken,
+            process.env.SOCKET_TOKEN_V2 ? '(desde ENV)' : '(valor por defecto)');
 
-        this.socketCanal = process.env.SOCKET_CANAL;
-        this.socketToken = process.env.SOCKET_TOKEN;
-        this.socketUrl = process.env.SOCKET_URL;
-
-        // Construir URL completa
+        // Asegurar URL completa
         if (this.socketUrl && !this.socketUrl.includes('/socket/enviar-mensaje')) {
             this.socketUrl = this.socketUrl.replace(/\/?$/, '/socket/enviar-mensaje');
         }
+
+        console.log('✅ Socket configurado exitosamente');
     }
 
     formatearFecha(fecha) {
