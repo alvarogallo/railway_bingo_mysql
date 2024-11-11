@@ -12,12 +12,6 @@ class AmbienteTimer {
         this.startTimers = [];
         this.intervalo = 30;
         this.mysqlService = null;
-        this.UTC_OFFSET = -5; // Colombia UTC-5
-    }
-    getColombiaTime(date = new Date()) {
-        // Ajustar a hora Colombia (UTC-5)
-        const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-        return new Date(utc + (3600000 * this.UTC_OFFSET));
     }
 
     async setMySQLConnection(pool) {
@@ -39,23 +33,22 @@ class AmbienteTimer {
         }
     }
 
-    formatTimeShort(date) {
-        const colombiaTime = this.getColombiaTime(date);
-        const hours = colombiaTime.getHours().toString().padStart(2, '0');
-        const minutes = colombiaTime.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
+    getLocalDate(date = new Date()) {
+        return new Date(date);
     }
 
     formatDateTime(date) {
         if (!date) return null;
-        const colombiaTime = this.getColombiaTime(date);
-        return colombiaTime.toLocaleString('es-CO', {
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
+        return date.toLocaleString('es-CO', {
+            timeZone: 'America/Bogota'
+        });
+    }
+
+    formatTimeShort(date) {
+        return date.toLocaleTimeString('es-CO', {
+            timeZone: 'America/Bogota',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
             hour12: false
         });
     }
@@ -97,48 +90,38 @@ class AmbienteTimer {
     }
 
     calculateTimeStarts() {
-        const now = this.getColombiaTime();
-        const currentMinutes = now.getMinutes();
-        const currentHour = now.getHours();
+        const now = new Date();
+        let nextPoints = [];
+
+        // Obtener la hora actual en minutos desde medianoche
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Calcular el próximo intervalo
+        const nextIntervalMinutes = Math.ceil(currentMinutes / this.intervalo) * this.intervalo;
+
+        // Primer punto
+        const firstPoint = new Date(now);
+        firstPoint.setHours(Math.floor(nextIntervalMinutes / 60));
+        firstPoint.setMinutes(nextIntervalMinutes % 60);
+        firstPoint.setSeconds(0);
+        firstPoint.setMilliseconds(0);
+
+        // Segundo punto
+        const secondPoint = new Date(firstPoint);
+        secondPoint.setMinutes(firstPoint.getMinutes() + this.intervalo);
+
+        nextPoints = [firstPoint, secondPoint];
 
         // Limpiar timers anteriores
         this.startTimers.forEach(timer => clearTimeout(timer));
         this.startTimers = [];
 
-        // Calcular próximo intervalo
-        const nextIntervalMinutes = Math.ceil(currentMinutes / this.intervalo) * this.intervalo;
-        let firstPointHour = currentHour;
-        let firstPointMinutes = nextIntervalMinutes;
+        this.timeStarts = nextPoints.map(date => ({
+            time: this.formatTimeShort(date),
+            timestamp: date.getTime()
+        }));
 
-        // Ajustar si pasamos a la siguiente hora
-        if (firstPointMinutes >= 60) {
-            firstPointHour++;
-            firstPointMinutes = 0;
-        }
-
-        // Crear puntos de arranque
-        const firstPoint = new Date(now);
-        firstPoint.setHours(firstPointHour, firstPointMinutes, 0, 0);
-
-        const secondPoint = new Date(firstPoint);
-        if (firstPointMinutes + this.intervalo >= 60) {
-            secondPoint.setHours(firstPointHour + 1, 0, 0, 0);
-        } else {
-            secondPoint.setMinutes(firstPointMinutes + this.intervalo);
-        }
-
-        this.timeStarts = [
-            {
-                time: this.formatTimeShort(firstPoint),
-                timestamp: firstPoint.getTime()
-            },
-            {
-                time: this.formatTimeShort(secondPoint),
-                timestamp: secondPoint.getTime()
-            }
-        ];
-
-        // Configurar timers
+        // Configurar los timers
         this.timeStarts.forEach(point => {
             const timeUntilStart = point.timestamp - now.getTime();
             if (timeUntilStart > 0) {
@@ -152,7 +135,7 @@ class AmbienteTimer {
             }
         });
 
-        console.log('Próximos puntos de arranque:', this.timeStarts.map(t => t.time).join(', '));
+        console.log('Puntos de arranque calculados:', this.timeStarts.map(t => t.time));
     }
 
     updateExpirationTime() {
@@ -186,7 +169,7 @@ class AmbienteTimer {
     }
 
     getStatus() {
-        const now = this.getColombiaTime();
+        const now = new Date();
         return {
             conexiones: this.conexiones,
             createdAt: this.formatDateTime(this.createdAt),
@@ -203,7 +186,7 @@ class AmbienteTimer {
     }
 
     getTimeStarts() {
-        const now = this.getColombiaTime();
+        const now = new Date();
         return {
             currentTime: this.formatTimeShort(now),
             timeStarts: this.timeStarts.map(point => ({
@@ -212,7 +195,6 @@ class AmbienteTimer {
             }))
         };
     }
-
 }
 
 module.exports = AmbienteTimer;
