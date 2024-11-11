@@ -1,16 +1,32 @@
+require('dotenv').config();
 const express = require('express');
 const AmbienteTimer = require('./ambiente');
 const setupApiRoutes = require('./api');
+const { createPool } = require('./config/database');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-// Instancia del ambiente
-const ambienteTimer = new AmbienteTimer();
+async function startServer() {
+    // Instancia del ambiente
+    const ambienteTimer = new AmbienteTimer();
 
-// Configurar rutas API
-app.use('/api', setupApiRoutes(ambienteTimer));
+    try {
+        // Intentar crear pool de conexiones
+        const pool = await createPool();
+        ambienteTimer.setMySQLConnection(pool);
+    } catch (error) {
+        console.error('\x1b[33m%s\x1b[0m', 'No se pudo conectar a MySQL. El sistema funcionará sin base de datos:', error.message);
+        // Continuar sin MySQL
+    }
 
-app.listen(port, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`);
-});
+    // Configurar rutas API
+    app.use('/api', setupApiRoutes(ambienteTimer));
+
+    app.listen(port, () => {
+        console.log(`Servidor corriendo en http://localhost:${port}`);
+        console.log(`Ambiente: ${process.env.NODE_ENV}`);
+    });
+}
+
+startServer();
