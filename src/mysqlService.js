@@ -50,25 +50,6 @@ class AmbienteTimer {
         }
     }
 
-    async addConexion(ip) {
-        if (!this.conexionesActivas.has(ip)) {
-            this.conexiones += 1;
-            this.conexionesActivas.add(ip);
-            this.updateExpirationTime();
-            this.setTimer();
-
-            if (this.mysqlService?.isConnected) {
-                await this.mysqlService.registrarConexion(ip, this.expiresAt);
-            }
-
-            console.log(`Nueva conexión desde ${ip}. Total conexiones: ${this.conexiones}`);
-        } else {
-            this.updateExpirationTime();
-            this.setTimer();
-            console.log(`Conexión existente desde ${ip}. Extendiendo tiempo.`);
-        }
-    }
-
     calculateTimeStarts() {
         const now = new Date();
         let nextPoints = [];
@@ -122,21 +103,6 @@ class AmbienteTimer {
         console.log(`Puntos de arranque calculados con intervalo de ${this.intervalo} minutos:`, this.timeStarts);
     }
 
-    updateExpirationTime() {
-        this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
-        this.calculateTimeStarts();
-    }
-
-    setTimer() {
-        if (this.timer) {
-            clearTimeout(this.timer);
-        }
-        this.timer = setTimeout(() => {
-            this.reset();
-            console.log('Ambiente reseteado por timeout');
-        }, this.hoursToLive * 60 * 60 * 1000);
-    }
-
     async reset() {
         if (this.mysqlService?.isConnected) {
             await this.mysqlService.limpiarRegistros();
@@ -172,19 +138,7 @@ class AmbienteTimer {
         };
     }
 
-    getTimeStarts() {
-        const now = Date.now();
-        return {
-            currentTime: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
-            timeStarts: this.timeStarts.map(point => ({
-                ...point,
-                secondsUntilStart: Math.max(0, Math.round((point.timestamp - now) / 1000))
-            }))
-        };
-    }
+    // ... otros métodos permanecen igual ...
 }
 
 module.exports = AmbienteTimer;
