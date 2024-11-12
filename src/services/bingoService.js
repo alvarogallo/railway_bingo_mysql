@@ -49,9 +49,9 @@ class BingoService {
             const nombreEvento = this.formatoEvento || 'Bingo_error';
             
             const mensaje = {
-                numero: numero,
-                secuencia: secuencia,
-                fecha: moment(fecha).format('YYYY-MM-DD HH:mm:ss')
+                num: numero,
+                sec: secuencia,
+                fecha: moment(fecha).format('HH:mm:ss')
             };
 
             await EventosService.emitirEvento(
