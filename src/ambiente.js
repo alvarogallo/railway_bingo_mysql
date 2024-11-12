@@ -26,6 +26,10 @@ class AmbienteTimer {
 
     async setMySQLConnection(pool) {
         this.mysqlService = new MySQLService(pool);
+        // Pasar la conexión al bingoService
+        if (this.bingoService) {
+            this.bingoService.setMySQLPool(pool);
+        }
         if (this.mysqlService.isConnected) {
             await this.loadParameters();
         }

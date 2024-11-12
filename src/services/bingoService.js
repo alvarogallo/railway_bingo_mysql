@@ -11,6 +11,11 @@ class BingoService {
         this.startTime = null;
         this.formatoEvento = null;
         this.intervaloSegundos = 20; // valor por defecto
+        this.mysqlPool = null; // Nueva propiedad para la conexión
+    }
+
+    setMySQLPool(pool) {
+        this.mysqlPool = pool;
     }
 
     setIntervalo(segundos) {
@@ -19,6 +24,56 @@ class BingoService {
             console.log(`Intervalo de bingo actualizado a ${segundos} segundos`);
         }
     }
+
+    async guardarResultadoBingo() {
+        if (!this.mysqlPool || !this.formatoEvento) {
+            console.log('No se puede guardar el bingo: falta conexión o formato de evento');
+            return false;
+        }
+
+        try {
+            const numerosStr = this.usedNumbers.join(',');
+            
+            await this.mysqlPool.execute(
+                'INSERT INTO bingos (evento, numeros) VALUES (?, ?)',
+                [this.formatoEvento, numerosStr]
+            );
+
+            console.log('Bingo guardado en la base de datos:', {
+                evento: this.formatoEvento,
+                numeros: numerosStr
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Error al guardar el bingo en la base de datos:', error);
+            return false;
+        }
+    }
+    stop() {
+        if (this.currentInterval) {
+            clearInterval(this.currentInterval);
+            this.currentInterval = null;
+            
+            // Guardar el bingo en la base de datos
+            this.guardarResultadoBingo().then(saved => {
+                if (saved) {
+                    console.log('✅ Bingo guardado correctamente');
+                } else {
+                    console.log('❌ No se pudo guardar el bingo');
+                }
+            });
+
+            this.isRunning = false;
+            this.startTime = null;
+            
+            console.log('\n=== BINGO FINALIZADO ===');
+            console.log(`Total números generados: ${this.usedNumbers.length}`);
+            console.log(`Números utilizados: ${this.usedNumbers.join(', ')}`);
+            
+            this.formatoEvento = null;
+        }
+    }    
 
     shuffle() {
         for (let i = this.numbers.length - 1; i > 0; i--) {
