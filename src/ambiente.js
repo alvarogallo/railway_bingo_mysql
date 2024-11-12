@@ -110,79 +110,101 @@ class AmbienteTimer {
         }
     }
 
-    calculateTimeStarts() {
-        const now = new Date();
-        let nextPoints = [];
+// ... resto del código ...
 
-        // Obtener la hora actual en minutos desde medianoche
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+calculateTimeStarts() {
+    const now = new Date();
+    let nextPoints = [];
 
-        // Calcular el próximo intervalo
-        const nextIntervalMinutes = Math.ceil(currentMinutes / this.intervalo) * this.intervalo;
+    // Obtener la hora actual en minutos desde medianoche
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-        // Primer punto
-        const firstPoint = new Date(now);
-        firstPoint.setHours(Math.floor(nextIntervalMinutes / 60));
-        firstPoint.setMinutes(nextIntervalMinutes % 60);
-        firstPoint.setSeconds(0);
-        firstPoint.setMilliseconds(0);
+    // Calcular el próximo intervalo
+    const nextIntervalMinutes = Math.ceil(currentMinutes / this.intervalo) * this.intervalo;
 
-        // Segundo punto
-        const secondPoint = new Date(firstPoint);
-        secondPoint.setMinutes(firstPoint.getMinutes() + this.intervalo);
+    // Primer punto
+    const firstPoint = new Date(now);
+    firstPoint.setHours(Math.floor(nextIntervalMinutes / 60));
+    firstPoint.setMinutes(nextIntervalMinutes % 60);
+    firstPoint.setSeconds(0);
+    firstPoint.setMilliseconds(0);
 
-        nextPoints = [firstPoint, secondPoint];
+    // Segundo punto
+    const secondPoint = new Date(firstPoint);
+    secondPoint.setMinutes(firstPoint.getMinutes() + this.intervalo);
 
-        // Limpiar timers anteriores
-        this.startTimers.forEach(timer => clearTimeout(timer));
-        this.startTimers = [];
+    nextPoints = [firstPoint, secondPoint];
 
-        this.timeStarts = nextPoints.map(date => ({
-            time: this.formatTimeShort(date),
-            timestamp: date.getTime()
-        }));
+    // Limpiar timers anteriores
+    this.startTimers.forEach(timer => clearTimeout(timer));
+    this.startTimers = [];
 
-        // Configurar los timers
-        this.timeStarts.forEach(point => {
-            const timeUntilStart = point.timestamp - now.getTime();
-            if (timeUntilStart > 0) {
-                const timer = setTimeout(async () => {
-                    try {
-                        console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
-                        
-                        if (!this.bingoService) {
-                            console.error('⚠️ Error: bingoService no está disponible');
-                            return;
-                        }
+    this.timeStarts = nextPoints.map(date => ({
+        time: this.formatTimeShort(date),
+        timestamp: date.getTime()
+    }));
 
-                        if (this.bingoService.isRunning) {
-                            console.log('⚠️ Ya hay un bingo en curso');
-                        } else {
-                            console.log('🎲 Iniciando nuevo bingo...');
-                            this.bingoService.start();
-                            
-                            // Emitir evento de inicio de bingo
-                            const fecha_bingo = new Date(point.timestamp);
-                            await EventosService.emitirEvento(
-                                'Bingo',
-                                'Inicia',
-                                fecha_bingo
-                            );
-
-                            if (this.mysqlService?.isConnected) {
-                                await this.mysqlService.registrarTimeStart(fecha_bingo);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error al iniciar bingo:', error);
+    // Configurar los timers
+    this.timeStarts.forEach(point => {
+        const timeUntilStart = point.timestamp - now.getTime();
+        if (timeUntilStart > 0) {
+            const timer = setTimeout(async () => {
+                try {
+                    console.log(`=== HORA DE ARRANCAR (${point.time}) ===`);
+                    
+                    if (!this.bingoService) {
+                        console.error('⚠️ Error: bingoService no está disponible');
+                        return;
                     }
-                }, timeUntilStart);
-                this.startTimers.push(timer);
-            }
-        });
 
-        console.log('Puntos de arranque calculados:', this.timeStarts.map(t => t.time));
-    }
+                    // Leer el parámetro segundos justo antes de iniciar el bingo
+                    if (this.mysqlService?.isConnected) {
+                        try {
+                            const segundos = await this.mysqlService.getParametro('segundos');
+                            if (segundos) {
+                                const segundosNum = parseInt(segundos);
+                                this.bingoService.setIntervalo(segundosNum);
+                                console.log(`Segundos actualizados de la BD: ${segundosNum}`);
+                            } else {
+                                console.log('Usando valor por defecto: 20 segundos');
+                                this.bingoService.setIntervalo(20);
+                            }
+                        } catch (error) {
+                            console.log('Error al leer segundos, usando valor por defecto:', error.message);
+                            this.bingoService.setIntervalo(20);
+                        }
+                    }
+
+                    if (this.bingoService.isRunning) {
+                        console.log('⚠️ Ya hay un bingo en curso');
+                    } else {
+                        console.log('🎲 Iniciando nuevo bingo...');
+                        this.bingoService.start();
+                        
+                        // Emitir evento de inicio de bingo
+                        const fecha_bingo = new Date(point.timestamp);
+                        await EventosService.emitirEvento(
+                            'Bingo',
+                            'Inicia',
+                            fecha_bingo
+                        );
+
+                        if (this.mysqlService?.isConnected) {
+                            await this.mysqlService.registrarTimeStart(fecha_bingo);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error al iniciar bingo:', error);
+                }
+            }, timeUntilStart);
+            this.startTimers.push(timer);
+        }
+    });
+
+    console.log('Puntos de arranque calculados:', this.timeStarts.map(t => t.time));
+}
+
+// ... resto del código ...
 
     updateExpirationTime() {
         this.expiresAt = new Date(Date.now() + (this.hoursToLive * 60 * 60 * 1000));
