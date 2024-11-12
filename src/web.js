@@ -122,6 +122,59 @@ function setupWebRoutes(app, pool) {
         }
     });
 
+    
+    app.get('/setup-db', async (req, res) => {
+        if (!pool) {
+            return res.json({ error: 'No hay conexión a la base de datos' });
+        }
+
+        try {
+            // Crear tabla parametros si no existe
+            await pool.execute(`
+                CREATE TABLE IF NOT EXISTS parametros (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nombre VARCHAR(50) NOT NULL UNIQUE,
+                    valor VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
+
+            // Verificar si existe el parámetro segundos
+            const [rows] = await pool.execute('SELECT * FROM parametros WHERE nombre = ?', ['segundos']);
+            if (rows.length === 0) {
+                await pool.execute(
+                    'INSERT INTO parametros (nombre, valor) VALUES (?, ?)',
+                    ['segundos', '20']
+                );
+                console.log('Parámetro segundos creado con valor por defecto: 20');
+            }
+
+            // Eliminar tabla bingos si existe y crear nueva con VARCHAR más largo
+            await pool.execute('DROP TABLE IF EXISTS bingos');
+            await pool.execute(`
+                CREATE TABLE bingos (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    evento VARCHAR(50) NOT NULL,
+                    numeros VARCHAR(256) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
+
+            res.json({ 
+                success: true, 
+                message: 'Tablas verificadas/creadas con éxito'
+            });
+
+        } catch (error) {
+            console.error('Error en setup-db:', error);
+            res.status(500).json({ 
+                error: 'Error al configurar la base de datos', 
+                details: error.message
+            });
+        }
+    });
+
     // Ruta adicional para verificar directamente la tabla parametros
     app.get('/check-parametros', async (req, res) => {
         if (!pool) {
