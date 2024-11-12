@@ -23,7 +23,6 @@
             color: #333;
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
-            margin-bottom: 20px;
         }
         table {
             width: 100%;
@@ -50,23 +49,31 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .setup-button {
+        .buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .button {
             background-color: #4CAF50;
             color: white;
             padding: 10px 20px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-bottom: 20px;
         }
-        .setup-button:hover {
+        .button:hover {
             background-color: #45a049;
         }
     </style>
 </head>
 <body>
     <h1>Estructura de Base de Datos</h1>
-    <button onclick="setupDatabase()" class="setup-button">Configurar Base de Datos</button>
+    <div class="buttons">
+        <button onclick="setupDatabase()" class="button">Configurar Base de Datos</button>
+        <button onclick="checkParametros()" class="button">Verificar Tabla Parametros</button>
+        <button onclick="loadTables()" class="button">Recargar Tablas</button>
+    </div>
     <div id="content">
         <p>Cargando información de las tablas...</p>
     </div>
@@ -87,6 +94,84 @@
             }
         }
 
+        async function checkParametros() {
+            try {
+                const response = await fetch('/check-parametros');
+                const data = await response.json();
+                const content = document.getElementById('content');
+                
+                if (data.error) {
+                    content.innerHTML = `
+                        <div class="error">
+                            <h3>Error</h3>
+                            <p>${data.error}</p>
+                            <p>${data.details || ''}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                content.innerHTML = `
+                    <div class="table-container">
+                        <h2>Tabla: parametros</h2>
+                        <h3>Estructura:</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Campo</th>
+                                    <th>Tipo</th>
+                                    <th>Nulo</th>
+                                    <th>Llave</th>
+                                    <th>Extra</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.estructura.map(col => `
+                                    <tr>
+                                        <td>${col.Field}</td>
+                                        <td>${col.Type}</td>
+                                        <td>${col.Null}</td>
+                                        <td>${col.Key}</td>
+                                        <td>${col.Extra}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <h3>Datos:</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Valor</th>
+                                    <th>Creado</th>
+                                    <th>Actualizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.datos.map(row => `
+                                    <tr>
+                                        <td>${row.id}</td>
+                                        <td>${row.nombre}</td>
+                                        <td>${row.valor}</td>
+                                        <td>${row.created_at}</td>
+                                        <td>${row.updated_at}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <h3>Error</h3>
+                        <p>Error al verificar la tabla parametros</p>
+                    </div>
+                `;
+            }
+        }
+
         async function loadTables() {
             try {
                 const response = await fetch('/tables-info');
@@ -97,16 +182,7 @@
                         <div class="error">
                             <h3>Error</h3>
                             <p>${data.error}</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                if (Object.keys(data).length === 0) {
-                    document.getElementById('content').innerHTML = `
-                        <div class="error">
-                            <h3>No hay tablas</h3>
-                            <p>No se encontraron tablas en la base de datos</p>
+                            <p>${data.details || ''}</p>
                         </div>
                     `;
                     return;
@@ -128,28 +204,22 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                    `;
-
-                    for (const column of columns) {
-                        html += `
-                            <tr>
-                                <td>${column.name || '-'}</td>
-                                <td>${column.type || '-'}</td>
-                                <td>${column.nullable || '-'}</td>
-                                <td>${column.key || '-'}</td>
-                                <td>${column.extra || '-'}</td>
-                            </tr>
-                        `;
-                    }
-
-                    html += `
+                                    ${columns.map(column => `
+                                        <tr>
+                                            <td>${column.name || '-'}</td>
+                                            <td>${column.type || '-'}</td>
+                                            <td>${column.nullable || '-'}</td>
+                                            <td>${column.key || '-'}</td>
+                                            <td>${column.extra || '-'}</td>
+                                        </tr>
+                                    `).join('')}
                                 </tbody>
                             </table>
                         </div>
                     `;
                 }
 
-                document.getElementById('content').innerHTML = html;
+                document.getElementById('content').innerHTML = html || '<p>No se encontraron tablas</p>';
             } catch (error) {
                 document.getElementById('content').innerHTML = `
                     <div class="error">
