@@ -51,7 +51,7 @@ class BingoService {
             const mensaje = {
                 num: numero,
                 sec: secuencia,
-                fecha: moment(fecha).format('HH:mm:ss')
+                hora: moment(fecha).format('HH:mm:ss')
             };
 
             await EventosService.emitirEvento(
