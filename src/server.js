@@ -19,7 +19,10 @@ async function startServer() {
         console.log('\x1b[33m%s\x1b[0m', 'No conexión base de datos');
     }
 
-    app.use('/', setupWebRoutes(pool));
+    // Montar las rutas web primero
+    setupWebRoutes(app, pool);
+    
+    // Luego montar las rutas API
     app.use('/api', setupApiRoutes(ambienteTimer));
 
     app.listen(port, () => {
