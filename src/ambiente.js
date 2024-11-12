@@ -234,7 +234,8 @@ class AmbienteTimer {
             bingoEnCurso: this.bingoService ? this.bingoService.isRunning : false,
             numerosBingoUsados: this.bingoService ? this.bingoService.usedNumbers.length : 0,
             conexion_mysql: !!this.mysqlService?.isConnected,
-            intervalo: this.intervalo
+            intervalo: this.intervalo,
+            segundos: this.bingoService ? this.bingoService.intervaloSegundos : 20
         };
     }
 
