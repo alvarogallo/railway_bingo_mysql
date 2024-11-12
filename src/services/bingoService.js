@@ -10,6 +10,14 @@ class BingoService {
         this.isRunning = false;
         this.startTime = null;
         this.formatoEvento = null;
+        this.intervaloSegundos = 20; // valor por defecto
+    }
+
+    setIntervalo(segundos) {
+        if (typeof segundos === 'number' && segundos > 0) {
+            this.intervaloSegundos = segundos;
+            console.log(`Intervalo de bingo actualizado a ${segundos} segundos`);
+        }
     }
 
     shuffle() {
@@ -32,7 +40,6 @@ class BingoService {
 
     async emitirNumero(numero, secuencia, fecha) {
         try {
-            // Formato: Bingo_YYYY-MM-DD_HH:mm
             const nombreEvento = this.formatoEvento || 'Bingo_error';
             
             const mensaje = {
@@ -59,11 +66,11 @@ class BingoService {
         }
 
         this.startTime = fechaInicio;
-        // Crear el formato del evento: Bingo_YYYY-MM-DD_HH:mm
         this.formatoEvento = `Bingo_${moment(fechaInicio).format('YYYY-MM-DD_HH:mm')}`;
 
         console.log('\n=== NUEVO BINGO INICIADO ===');
         console.log('Formato de evento:', this.formatoEvento);
+        console.log(`Intervalo configurado: ${this.intervaloSegundos} segundos`);
 
         // Reiniciar el estado
         this.numbers = Array.from({ length: 75 }, (_, i) => i + 1);
@@ -78,16 +85,15 @@ class BingoService {
                 console.log(`\n🎲 Número ${number} (${this.usedNumbers.length}/75)`);
                 console.log(`Números usados: ${this.usedNumbers.join(', ')}`);
                 
-                // Emitir el número al socket
                 await this.emitirNumero(
                     number,
                     this.usedNumbers.length,
                     currentTime
                 );
             }
-        }, 5000); // 5 segundos
+        }, this.intervaloSegundos * 1000); // Convertir segundos a milisegundos
 
-        console.log('Generación de números iniciada - Intervalo: 5 segundos');
+        console.log(`Generación de números iniciada - Intervalo: ${this.intervaloSegundos} segundos`);
     }
 
     stop() {

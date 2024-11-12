@@ -33,10 +33,21 @@ class AmbienteTimer {
 
     async loadParameters() {
         try {
+            // Cargar intervalo de minutos
             const intervalo = await this.mysqlService.getParametro('intervalo');
             if (intervalo) {
                 this.intervalo = parseInt(intervalo);
                 console.log(`Intervalo cargado de la base de datos: ${this.intervalo} minutos`);
+            }
+    
+            // Cargar segundos para el bingo
+            const segundos = await this.mysqlService.getParametro('segundos');
+            if (segundos && this.bingoService) {
+                const segundosNum = parseInt(segundos);
+                this.bingoService.setIntervalo(segundosNum);
+                console.log(`Segundos para bingo cargados de la base de datos: ${segundosNum} segundos`);
+            } else {
+                console.log('Usando valor por defecto de 20 segundos para el bingo');
             }
         } catch (error) {
             console.log('Error al cargar parámetros:', error.message);
