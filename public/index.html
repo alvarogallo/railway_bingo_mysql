@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estructura de Base de Datos</title>
+    <title>Estado del Bingo</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,6 +23,7 @@
             color: #333;
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
+            margin-bottom: 20px;
         }
         table {
             width: 100%;
@@ -49,43 +50,88 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .buttons {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        .button {
+        .setup-button {
             background-color: #4CAF50;
             color: white;
             padding: 10px 20px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            margin-bottom: 20px;
         }
-        .button:hover {
+        .setup-button:hover {
             background-color: #45a049;
+        }
+        .refresh-button {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .refresh-button:hover {
+            background-color: #1976D2;
+        }
+        .buttons {
+            margin-bottom: 20px;
+        }
+        .numeros-list {
+            max-height: 100px;
+            overflow-y: auto;
+            word-wrap: break-word;
+        }
+        .auto-refresh {
+            margin-left: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
     </style>
 </head>
 <body>
-    <h1>Estructura de Base de Datos</h1>
+    <h1>Estado del Bingo</h1>
+    
     <div class="buttons">
-        <button onclick="setupDatabase()" class="button">Configurar Base de Datos</button>
-        <button onclick="checkParametros()" class="button">Verificar Tabla Parametros</button>
-        <button onclick="loadTables()" class="button">Recargar Tablas</button>
+        <button onclick="setupDatabase()" class="setup-button">Configurar Base de Datos</button>
+        <button onclick="loadData()" class="refresh-button">Actualizar Datos</button>
+        <label class="auto-refresh">
+            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+            Auto-actualizar (5s)
+        </label>
     </div>
-    <div id="content">
-        <p>Cargando información de las tablas...</p>
+
+    <div class="table-container">
+        <h2>Parámetros</h2>
+        <div id="parametros-content">Cargando parámetros...</div>
+    </div>
+
+    <div class="table-container">
+        <h2>Últimos Bingos</h2>
+        <div id="bingos-content">Cargando bingos...</div>
     </div>
 
     <script>
+        let autoRefreshInterval;
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (checkbox.checked) {
+                loadData();
+                autoRefreshInterval = setInterval(loadData, 5000);
+            } else {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+
         async function setupDatabase() {
             try {
                 const response = await fetch('/setup-db');
                 const result = await response.json();
                 if (result.success) {
                     alert('Base de datos configurada con éxito');
-                    loadTables();
+                    loadData();
                 } else {
                     alert('Error: ' + (result.error || 'Error desconocido'));
                 }
@@ -94,144 +140,84 @@
             }
         }
 
-        async function checkParametros() {
+        async function loadData() {
             try {
-                const response = await fetch('/check-parametros');
-                const data = await response.json();
-                const content = document.getElementById('content');
+                // Cargar parámetros
+                const paramResponse = await fetch('/check-parametros');
+                const paramData = await paramResponse.json();
                 
-                if (data.error) {
-                    content.innerHTML = `
+                if (paramData.error) {
+                    document.getElementById('parametros-content').innerHTML = `
                         <div class="error">
-                            <h3>Error</h3>
-                            <p>${data.error}</p>
-                            <p>${data.details || ''}</p>
+                            <p>${paramData.error}</p>
                         </div>
                     `;
-                    return;
-                }
-
-                content.innerHTML = `
-                    <div class="table-container">
-                        <h2>Tabla: parametros</h2>
-                        <h3>Estructura:</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Campo</th>
-                                    <th>Tipo</th>
-                                    <th>Nulo</th>
-                                    <th>Llave</th>
-                                    <th>Extra</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.estructura.map(col => `
-                                    <tr>
-                                        <td>${col.Field}</td>
-                                        <td>${col.Type}</td>
-                                        <td>${col.Null}</td>
-                                        <td>${col.Key}</td>
-                                        <td>${col.Extra}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                        <h3>Datos:</h3>
+                } else {
+                    document.getElementById('parametros-content').innerHTML = `
                         <table>
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Nombre</th>
                                     <th>Valor</th>
-                                    <th>Creado</th>
-                                    <th>Actualizado</th>
+                                    <th>Última Actualización</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.datos.map(row => `
+                                ${paramData.datos.map(param => `
                                     <tr>
-                                        <td>${row.id}</td>
-                                        <td>${row.nombre}</td>
-                                        <td>${row.valor}</td>
-                                        <td>${row.created_at}</td>
-                                        <td>${row.updated_at}</td>
+                                        <td>${param.id}</td>
+                                        <td>${param.nombre}</td>
+                                        <td>${param.valor}</td>
+                                        <td>${new Date(param.updated_at).toLocaleString()}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
-                    </div>
-                `;
-            } catch (error) {
-                document.getElementById('content').innerHTML = `
-                    <div class="error">
-                        <h3>Error</h3>
-                        <p>Error al verificar la tabla parametros</p>
-                    </div>
-                `;
-            }
-        }
+                    `;
+                }
 
-        async function loadTables() {
-            try {
-                const response = await fetch('/tables-info');
-                const data = await response.json();
-
-                if (data.error) {
-                    document.getElementById('content').innerHTML = `
+                // Cargar bingos
+                const bingoResponse = await fetch('/check-bingos');
+                const bingoData = await bingoResponse.json();
+                
+                if (bingoData.error) {
+                    document.getElementById('bingos-content').innerHTML = `
                         <div class="error">
-                            <h3>Error</h3>
-                            <p>${data.error}</p>
-                            <p>${data.details || ''}</p>
+                            <p>${bingoData.error}</p>
                         </div>
                     `;
-                    return;
-                }
-
-                let html = '';
-                for (const [tableName, columns] of Object.entries(data)) {
-                    html += `
-                        <div class="table-container">
-                            <h2>Tabla: ${tableName}</h2>
-                            <table>
-                                <thead>
+                } else {
+                    document.getElementById('bingos-content').innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Evento</th>
+                                    <th>Números</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${bingoData.ultimos_registros.map(bingo => `
                                     <tr>
-                                        <th>Columna</th>
-                                        <th>Tipo</th>
-                                        <th>Nullable</th>
-                                        <th>Key</th>
-                                        <th>Extra</th>
+                                        <td>${bingo.id}</td>
+                                        <td>${bingo.evento}</td>
+                                        <td class="numeros-list">${bingo.numeros}</td>
+                                        <td>${new Date(bingo.created_at).toLocaleString()}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${columns.map(column => `
-                                        <tr>
-                                            <td>${column.name || '-'}</td>
-                                            <td>${column.type || '-'}</td>
-                                            <td>${column.nullable || '-'}</td>
-                                            <td>${column.key || '-'}</td>
-                                            <td>${column.extra || '-'}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     `;
                 }
-
-                document.getElementById('content').innerHTML = html || '<p>No se encontraron tablas</p>';
             } catch (error) {
-                document.getElementById('content').innerHTML = `
-                    <div class="error">
-                        <h3>Error</h3>
-                        <p>Error al cargar la información de las tablas</p>
-                    </div>
-                `;
+                console.error('Error al cargar datos:', error);
             }
         }
 
-        // Cargar las tablas cuando la página se carga
-        document.addEventListener('DOMContentLoaded', loadTables);
+        // Cargar datos al inicio
+        document.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>
 </html>
