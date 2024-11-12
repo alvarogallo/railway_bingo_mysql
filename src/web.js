@@ -5,6 +5,46 @@ function setupWebRoutes(app, pool) {
     // Servir archivos estáticos desde la carpeta public
     app.use(express.static(path.join(__dirname, '../public')));
 
+    // Ruta para recrear la tabla parametros
+    app.get('/setup-db', async (req, res) => {
+        if (!pool) {
+            return res.json({ error: 'No hay conexión a la base de datos' });
+        }
+
+        try {
+            // Eliminar tabla si existe
+            await pool.query('DROP TABLE IF EXISTS parametros');
+
+            // Crear nueva tabla
+            await pool.query(`
+                CREATE TABLE parametros (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nombre VARCHAR(50) NOT NULL UNIQUE,
+                    valor VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Insertar parámetro inicial
+            await pool.query(`
+                INSERT INTO parametros (nombre, valor) 
+                VALUES ('segundos', '20')
+            `);
+
+            res.json({ 
+                success: true, 
+                message: 'Tabla parametros recreada e inicializada con éxito'
+            });
+        } catch (error) {
+            console.error('Error al configurar la base de datos:', error);
+            res.json({ 
+                error: 'Error al configurar la base de datos', 
+                details: error.message 
+            });
+        }
+    });
+
     // Ruta para obtener la estructura de las tablas
     app.get('/tables-info', async (req, res) => {
         if (!pool) {
