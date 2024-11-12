@@ -5,37 +5,47 @@ function setupWebRoutes(app, pool) {
     // Servir archivos estáticos desde la carpeta public
     app.use(express.static(path.join(__dirname, '../public')));
 
-    // Ruta para recrear la tabla parametros
+    // Ruta para crear las tablas si no existen
     app.get('/setup-db', async (req, res) => {
         if (!pool) {
             return res.json({ error: 'No hay conexión a la base de datos' });
         }
 
         try {
-            // Eliminar tabla si existe
-            await pool.execute('DROP TABLE IF EXISTS parametros');
-
-            // Crear nueva tabla
-            const createTableSQL = `
-                CREATE TABLE parametros (
+            // Crear tabla parametros si no existe
+            await pool.execute(`
+                CREATE TABLE IF NOT EXISTS parametros (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     nombre VARCHAR(50) NOT NULL UNIQUE,
                     valor VARCHAR(255) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            `;
-            await pool.execute(createTableSQL);
+            `);
 
-            // Insertar parámetro inicial
-            await pool.execute(
-                'INSERT INTO parametros (nombre, valor) VALUES (?, ?)',
-                ['segundos', '20']
-            );
+            // Verificar si existe el parámetro segundos
+            const [rows] = await pool.execute('SELECT * FROM parametros WHERE nombre = ?', ['segundos']);
+            if (rows.length === 0) {
+                await pool.execute(
+                    'INSERT INTO parametros (nombre, valor) VALUES (?, ?)',
+                    ['segundos', '20']
+                );
+                console.log('Parámetro segundos creado con valor por defecto: 20');
+            }
+
+            // Crear tabla bingos si no existe
+            await pool.execute(`
+                CREATE TABLE IF NOT EXISTS bingos (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    evento VARCHAR(16) NOT NULL,
+                    numeros VARCHAR(256) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
 
             res.json({ 
                 success: true, 
-                message: 'Tabla parametros recreada e inicializada con éxito'
+                message: 'Tablas verificadas/creadas con éxito'
             });
 
         } catch (error) {
@@ -43,6 +53,28 @@ function setupWebRoutes(app, pool) {
             res.status(500).json({ 
                 error: 'Error al configurar la base de datos', 
                 details: error.message
+            });
+        }
+    });
+
+    // Ruta para verificar la tabla bingos
+    app.get('/check-bingos', async (req, res) => {
+        if (!pool) {
+            return res.json({ error: 'No hay conexión a la base de datos' });
+        }
+
+        try {
+            const [columns] = await pool.query('SHOW COLUMNS FROM bingos');
+            const [data] = await pool.query('SELECT * FROM bingos ORDER BY id DESC LIMIT 10');
+            
+            res.json({
+                estructura: columns,
+                ultimos_registros: data
+            });
+        } catch (error) {
+            res.status(500).json({ 
+                error: 'Error al verificar tabla bingos',
+                details: error.message 
             });
         }
     });
