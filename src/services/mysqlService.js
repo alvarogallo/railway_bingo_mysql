@@ -4,15 +4,8 @@ class MySQLService {
         this.isConnected = !!pool;
     }
 
-    async dropTable() {
-        try {
-            await this.pool.query('DROP TABLE IF EXISTS parametros');
-            console.log('Tabla parametros eliminada con éxito');
-        } catch (error) {
-            console.log('Error al eliminar la tabla:', error.message);
-        }
-    }
 
+    
     async getParametro(nombre) {
         try {
             if (!this.isConnected) return null;
