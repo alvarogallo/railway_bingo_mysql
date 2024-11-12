@@ -122,40 +122,40 @@ function setupWebRoutes(app, pool) {
         }
     });
 
-    app.get('/recreate-bingos', async (req, res) => {
-        if (!pool) {
-            return res.json({ error: 'No hay conexión a la base de datos' });
-        }
+    // app.get('/recreate-bingos', async (req, res) => {
+    //     if (!pool) {
+    //         return res.json({ error: 'No hay conexión a la base de datos' });
+    //     }
 
-        try {
-            console.log('1. Eliminando tabla bingos...');
-            await pool.execute('DROP TABLE IF EXISTS bingos');
+    //     try {
+    //         console.log('1. Eliminando tabla bingos...');
+    //         await pool.execute('DROP TABLE IF EXISTS bingos');
 
-            console.log('2. Creando nueva tabla bingos...');
-            await pool.execute(`
-                CREATE TABLE bingos (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    evento VARCHAR(50) NOT NULL,
-                    numeros VARCHAR(256) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            `);
+    //         console.log('2. Creando nueva tabla bingos...');
+    //         await pool.execute(`
+    //             CREATE TABLE bingos (
+    //                 id INT AUTO_INCREMENT PRIMARY KEY,
+    //                 evento VARCHAR(50) NOT NULL,
+    //                 numeros VARCHAR(256) NOT NULL,
+    //                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    //             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    //         `);
 
-            console.log('3. Tabla bingos recreada exitosamente');
-            res.json({ 
-                success: true, 
-                message: 'Tabla bingos recreada con éxito'
-            });
+    //         console.log('3. Tabla bingos recreada exitosamente');
+    //         res.json({ 
+    //             success: true, 
+    //             message: 'Tabla bingos recreada con éxito'
+    //         });
 
-        } catch (error) {
-            console.error('Error al recrear tabla bingos:', error);
-            res.status(500).json({ 
-                error: 'Error al recrear tabla', 
-                details: error.message
-            });
-        }
-    });
-    
+    //     } catch (error) {
+    //         console.error('Error al recrear tabla bingos:', error);
+    //         res.status(500).json({ 
+    //             error: 'Error al recrear tabla', 
+    //             details: error.message
+    //         });
+    //     }
+    // });
+
     app.get('/setup-db', async (req, res) => {
         if (!pool) {
             return res.json({ error: 'No hay conexión a la base de datos' });
