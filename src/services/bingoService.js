@@ -10,12 +10,13 @@ class BingoService {
         this.isRunning = false;
         this.startTime = null;
         this.formatoEvento = null;
-        this.intervaloSegundos = 20; // valor por defecto
-        this.mysqlPool = null; // Nueva propiedad para la conexión
+        this.intervaloSegundos = 20;
+        this.pool = null; // Referencia a la conexión MySQL
     }
 
-    setMySQLPool(pool) {
-        this.mysqlPool = pool;
+    setPool(pool) {
+        this.pool = pool;
+        console.log('Pool MySQL configurado en BingoService');
     }
 
     setIntervalo(segundos) {
@@ -24,56 +25,6 @@ class BingoService {
             console.log(`Intervalo de bingo actualizado a ${segundos} segundos`);
         }
     }
-
-    async guardarResultadoBingo() {
-        if (!this.mysqlPool || !this.formatoEvento) {
-            console.log('No se puede guardar el bingo: falta conexión o formato de evento');
-            return false;
-        }
-
-        try {
-            const numerosStr = this.usedNumbers.join(',');
-            
-            await this.mysqlPool.execute(
-                'INSERT INTO bingos (evento, numeros) VALUES (?, ?)',
-                [this.formatoEvento, numerosStr]
-            );
-
-            console.log('Bingo guardado en la base de datos:', {
-                evento: this.formatoEvento,
-                numeros: numerosStr
-            });
-
-            return true;
-        } catch (error) {
-            console.error('Error al guardar el bingo en la base de datos:', error);
-            return false;
-        }
-    }
-    stop() {
-        if (this.currentInterval) {
-            clearInterval(this.currentInterval);
-            this.currentInterval = null;
-            
-            // Guardar el bingo en la base de datos
-            this.guardarResultadoBingo().then(saved => {
-                if (saved) {
-                    console.log('✅ Bingo guardado correctamente');
-                } else {
-                    console.log('❌ No se pudo guardar el bingo');
-                }
-            });
-
-            this.isRunning = false;
-            this.startTime = null;
-            
-            console.log('\n=== BINGO FINALIZADO ===');
-            console.log(`Total números generados: ${this.usedNumbers.length}`);
-            console.log(`Números utilizados: ${this.usedNumbers.join(', ')}`);
-            
-            this.formatoEvento = null;
-        }
-    }    
 
     shuffle() {
         for (let i = this.numbers.length - 1; i > 0; i--) {
@@ -127,7 +78,6 @@ class BingoService {
         console.log('Formato de evento:', this.formatoEvento);
         console.log(`Intervalo configurado: ${this.intervaloSegundos} segundos`);
 
-        // Reiniciar el estado
         this.numbers = Array.from({ length: 75 }, (_, i) => i + 1);
         this.usedNumbers = [];
         this.shuffle();
@@ -146,18 +96,39 @@ class BingoService {
                     currentTime
                 );
             }
-        }, this.intervaloSegundos * 1000); // Convertir segundos a milisegundos
+        }, this.intervaloSegundos * 1000);
 
         console.log(`Generación de números iniciada - Intervalo: ${this.intervaloSegundos} segundos`);
     }
 
-    stop() {
+    async stop() {
         if (this.currentInterval) {
             clearInterval(this.currentInterval);
             this.currentInterval = null;
+
+            // Guardar en la base de datos
+            if (this.pool && this.formatoEvento && this.usedNumbers.length > 0) {
+                try {
+                    const numerosStr = this.usedNumbers.join(',');
+                    await this.pool.execute(
+                        'INSERT INTO bingos (evento, numeros) VALUES (?, ?)',
+                        [this.formatoEvento, numerosStr]
+                    );
+                    console.log('✅ Bingo guardado en base de datos:', this.formatoEvento);
+                } catch (error) {
+                    console.error('❌ Error al guardar bingo en base de datos:', error);
+                }
+            } else {
+                console.log('❌ No se pudo guardar el bingo: faltan datos o conexión');
+                console.log('Pool:', !!this.pool);
+                console.log('Formato evento:', this.formatoEvento);
+                console.log('Números usados:', this.usedNumbers.length);
+            }
+
             this.isRunning = false;
             this.startTime = null;
             this.formatoEvento = null;
+            
             console.log('\n=== BINGO FINALIZADO ===');
             console.log(`Total números generados: ${this.usedNumbers.length}`);
             console.log(`Números utilizados: ${this.usedNumbers.join(', ')}`);

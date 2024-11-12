@@ -24,17 +24,26 @@ class AmbienteTimer {
         }
     }
 
+    // async setMySQLConnection(pool) {
+    //     this.mysqlService = new MySQLService(pool);
+    //     // Pasar la conexión al bingoService
+    //     if (this.bingoService) {
+    //         this.bingoService.setMySQLPool(pool);
+    //     }
+    //     if (this.mysqlService.isConnected) {
+    //         await this.loadParameters();
+    //     }
+    // }
     async setMySQLConnection(pool) {
         this.mysqlService = new MySQLService(pool);
-        // Pasar la conexión al bingoService
         if (this.bingoService) {
-            this.bingoService.setMySQLPool(pool);
+            this.bingoService.setPool(pool); // Pasamos el pool al bingoService
+            console.log('Pool MySQL configurado en BingoService desde AmbienteTimer');
         }
         if (this.mysqlService.isConnected) {
             await this.loadParameters();
         }
     }
-
     async loadParameters() {
         try {
             // Cargar intervalo de minutos
