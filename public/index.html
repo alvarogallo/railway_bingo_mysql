@@ -23,6 +23,7 @@
             color: #333;
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
+            margin-bottom: 20px;
         }
         table {
             width: 100%;
@@ -32,7 +33,7 @@
         th, td {
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border: 1px solid #ddd;
         }
         th {
             background-color: #f8f9fa;
@@ -49,15 +50,43 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        .setup-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .setup-button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
     <h1>Estructura de Base de Datos</h1>
+    <button onclick="setupDatabase()" class="setup-button">Configurar Base de Datos</button>
     <div id="content">
         <p>Cargando información de las tablas...</p>
     </div>
 
     <script>
+        async function setupDatabase() {
+            try {
+                const response = await fetch('/setup-db');
+                const result = await response.json();
+                if (result.success) {
+                    alert('Base de datos configurada con éxito');
+                    loadTables();
+                } else {
+                    alert('Error: ' + (result.error || 'Error desconocido'));
+                }
+            } catch (error) {
+                alert('Error al configurar la base de datos');
+            }
+        }
+
         async function loadTables() {
             try {
                 const response = await fetch('/tables-info');
@@ -68,6 +97,16 @@
                         <div class="error">
                             <h3>Error</h3>
                             <p>${data.error}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (Object.keys(data).length === 0) {
+                    document.getElementById('content').innerHTML = `
+                        <div class="error">
+                            <h3>No hay tablas</h3>
+                            <p>No se encontraron tablas en la base de datos</p>
                         </div>
                     `;
                     return;
@@ -91,17 +130,17 @@
                                 <tbody>
                     `;
 
-                    columns.forEach(column => {
+                    for (const column of columns) {
                         html += `
                             <tr>
-                                <td>${column.name}</td>
-                                <td>${column.type}</td>
-                                <td>${column.nullable}</td>
+                                <td>${column.name || '-'}</td>
+                                <td>${column.type || '-'}</td>
+                                <td>${column.nullable || '-'}</td>
                                 <td>${column.key || '-'}</td>
                                 <td>${column.extra || '-'}</td>
                             </tr>
                         `;
-                    });
+                    }
 
                     html += `
                                 </tbody>
